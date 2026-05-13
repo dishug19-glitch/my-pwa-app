@@ -1,10 +1,15 @@
-const CACHE_NAME = 'label-printer-v1';
+// STEP 1: CHANGE THE VERSION NAME
+const CACHE_NAME = 'label-printer-v2';
+
+// STEP 2: ADD THE NEW ICON TO THE ASSETS
 const ASSETS = [
   './index.html',
   './manifest.json',
+  './icon-512.png', // Add this new local file
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css'
 ];
+
 
 // Install Service Worker and cache essential assets
 self.addEventListener('install', (e) => {
