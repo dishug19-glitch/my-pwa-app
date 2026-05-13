@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker registered!', reg))
+        .catch(err => console.log('Service Worker registration failed: ', err));
+    });
+  }
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#1a237e">
+<title>Box Label Printer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --primary:#1a237e;--primary-light:#3949ab;--accent:#ff6f00;
+  --bg:#eef0f8;--card:#fff;--text:#1a1a2e;--text2:#5c6080;
+  --border:#dde1f0;--radius:14px;
+  --shadow:0 2px 12px rgba(26,35,126,.10);
+  --danger:#c62828;--danger-bg:#ffebee;--danger-border:#ffcdd2;
+  --success:#2e7d32;--success-bg:#e8f5e9;
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+.topnav{
+  background:linear-gradient(135deg,#0d1642,#3949ab);
+  color:#fff;padding:0 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  height:58px;position:sticky;top:0;z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,.25)
+}
+.topnav h1{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.pdf-btn{
+  background:#ff6f00;color:#fff;border:none;border-radius:30px;
+  padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  box-shadow:0 3px 10px rgba(255,111,0,.4);
+  transition:opacity .2s,transform .1s
+}
+.pdf-btn:disabled{opacity:.6;cursor:not-allowed}
+.pdf-btn:not(:disabled):active{transform:scale(.96)}
+.tabs{
+  display:flex;background:#fff;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:58px;z-index:90
+}
+.tab{
+  flex:1;padding:12px 4px;text-align:center;
+  font-size:12px;font-weight:600;color:var(--text2);
+  border:none;background:none;cursor:pointer;
+  border-bottom:3px solid transparent;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  transition:color .2s
+}
+.tab i{font-size:20px}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.panel{display:none;padding:14px 12px;max-width:700px;margin:0 auto}
+.panel.active{display:block}
+.scard{
+  background:#fff;border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:16px;
+  margin-bottom:14px;border:1px solid var(--border)
+}
+.scard-title{
+  font-size:12px;font-weight:700;color:var(--primary);
+  text-transform:uppercase;letter-spacing:.7px;
+  margin-bottom:12px;display:flex;align-items:center;gap:7px
+}
+.scard-title i{font-size:18px;color:var(--accent)}
+.fl{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:4px;display:block}
+.inp{
+  width:100%;padding:11px 13px;
+  border:1.5px solid var(--border);border-radius:10px;
+  font-size:15px;color:var(--text);background:#f8f9fe;
+  outline:none;margin-bottom:10px;
+  -webkit-appearance:none;appearance:none;
+  transition:border-color .2s,background .2s
+}
+.inp:focus{border-color:var(--primary-light);background:#fff}
+.inp.invalid{border-color:#e53935;background:#fff8f8}
+select.inp{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%235c6080'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 13px center;padding-right:34px
+}
+.rg{margin-bottom:12px}
+.rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.rh .rl{font-size:12px;font-weight:600;color:var(--text2)}
+.rh .rv{font-size:13px;font-weight:700;color:var(--primary);background:#eef0f8;padding:2px 10px;border-radius:20px}
+input[type=range]{width:100%;height:6px;border-radius:3px;accent-color:var(--primary);cursor:pointer}
+.trow{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:12px}
+.trow span{font-size:14px;font-weight:600}
+.tgl{position:relative;width:46px;height:26px;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0}
+.tsl{position:absolute;inset:0;background:#ccc;border-radius:26px;transition:.3s;cursor:pointer}
+.tsl:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+input:checked+.tsl{background:var(--primary)}
+input:checked+.tsl:before{transform:translateX(20px)}
+.ccard{
+  background:linear-gradient(135deg,#f0f3ff,#fafafe);
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px;
+  transition:border-color .2s
+}
+.ccard.has-error{border-color:#e53935}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px;flex-wrap:wrap}
+.cnum{font-size:12px;font-weight:700;color:#fff;background:var(--primary);padding:3px 10px;border-radius:20px}
+.cbox{font-size:12px;font-weight:700;color:var(--accent);background:#fff3e0;padding:3px 10px;border-radius:20px;border:1px solid #ffe0b2}
+.rmc,.copyc{border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid}
+.rmc{background:var(--danger-bg);color:var(--danger);border-color:var(--danger-border)}
+.copyc{background:#e8eaf6;color:var(--primary);border-color:#c5cae9}
+.efrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.efrow .inp{margin-bottom:0;flex:1}
+.rmef{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);border-radius:8px;padding:9px 13px;font-size:16px;cursor:pointer}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:13px;border-radius:12px;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-top:4px;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-blue{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;box-shadow:0 3px 10px rgba(26,35,126,.25)}
+.btn-purple{background:linear-gradient(135deg,#6a1b9a,#ab47bc);color:#fff;box-shadow:0 3px 10px rgba(106,27,154,.25)}
+.btn-danger{background:linear-gradient(135deg,#b71c1c,#e53935);color:#fff;box-shadow:0 3px 10px rgba(183,28,28,.25)}
+.preview-page-wrap{overflow:hidden;margin-bottom:16px;border-radius:4px}
+.a4-page{background:#fff;box-shadow:0 3px 16px rgba(0,0,0,.15);display:grid;transform-origin:top left}
+.lc{border:1.5px solid #222;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow:hidden;padding:2mm}
+.lb{border:1.5px dashed #ccc;background:#f9f9f9}
+.pinfo{
+  background:linear-gradient(135deg,var(--primary),var(--primary-light));
+  color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600
+}
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:#323232;color:#fff;padding:11px 22px;border-radius:24px;
+  font-size:14px;font-weight:600;z-index:20000;
+  transition:transform .35s ease,opacity .35s ease;opacity:0;pointer-events:none;
+  white-space:nowrap
+}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.summary{
+  background:var(--success-bg);color:var(--success);
+  border:1px solid #a5d6a7;border-radius:10px;
+  padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;
+  display:flex;align-items:center;gap:8px
+}
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <h1>📦 Label Printer</h1>
+  <button class="pdf-btn" id="pdfBtn" onclick="generatePDF()">
+    <i class="ti ti-file-type-pdf"></i> Get PDF
+  </button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('Layout',this)"><i class="ti ti-layout-grid"></i>Layout</button>
+  <button class="tab" onclick="showTab('Style',this)"><i class="ti ti-typography"></i>Style</button>
+  <button class="tab" onclick="showTab('Customers',this)"><i class="ti ti-users"></i>Customers</button>
+  <button class="tab" onclick="showTab('Preview',this)"><i class="ti ti-eye"></i>Preview</button>
+</div>
+
+<!-- Layout Panel -->
+<div id="panelLayout" class="panel active">
+  <div class="scard">
+    <div class="scard-title"><i class="ti ti-file-description"></i>Paper &amp; Layout</div>
+    <span class="fl">Labels Per Sheet</span>
+    <select class="inp" id="labelsPerSheet" onchange="schedulePreview()">
+      <option value="4">4 per sheet — 2×2 (Large)</option>
+      <option value="6" selected>6 per sheet — 2×3 (A7)</option>
+      <option value="9">9 per sheet — 3×3</option>
+      <option value="10">10 per sheet — 2×5</option>
+      <option value="12">12 per sheet — 3×4</option>
+    </select>
+    <span class="fl">Orientation</span>
+    <select class="inp" id="orientation" onchange="schedulePreview()">
+      <option value="portrait">Portrait</option>
+      <option value="landscape">Landscape</option>
+    </select>
+  </div>
+  <div class="summary" id="summaryBar">
+    <i class="ti ti-tag"></i>
+    <span id="summaryText">0 labels across 0 pages</span>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <button class="btn btn-danger" onclick="clearAllCustomers()" style="flex:1">
+      <i class="ti ti-trash"></i> Clear All Customers
+    </button>
+  </div>
+</div>
+
+<!-- Style Panel -->
+<div id="panelStyle" class="panel">
+  <div class="scard">
+    <div class="scard-title"><i class="ti ti-palette"></i>Font &amp; Text</div>
+    <span class="fl">Font Family</span>
+    <select class="inp" id="fontFamily" onchange="schedulePreview()">
+      <option value="helvetica">Arial / Helvetica</option>
+      <option value="times">Times New Roman</option>
+      <option value="courier">Courier</option>
+    </select>
+    <div class="trow">
+      <span>Auto-fit text to label</span>
+      <label class="tgl">
+        <input type="checkbox" id="autoSize" checked onchange="toggleAuto()">
+        <span class="tsl"></span>
+      </label>
+    </div>
+    <div id="manualSizes">
+      <div class="rg">
+        <div class="rh"><span class="rl">Party Name Size</span><span class="rv" id="v1">36pt</span></div>
+        <input type="range" id="sizeParty" min="8" max="60" value="36" step="1"
+               oninput="document.getElementById('v1').textContent=this.value+'pt';schedulePreview()">
+      </div>
+      <div class="rg">
+        <div class="rh"><span class="rl">Details Size</span><span class="rv" id="v2">18pt</span></div>
+        <input type="range" id="sizeDetails" min="6" max="40" value="18" step="1"
+               oninput="document.getElementById('v2').textContent=this.value+'pt';schedulePreview()">
+      </div>
+      <div class="rg">
+        <div class="rh"><span class="rl">Box No. Size</span><span class="rv" id="v3">16pt</span></div>
+        <input type="range" id="sizeBoxNo" min="6" max="40" value="16" step="1"
+               oninput="document.getElementById('v3').textContent=this.value+'pt';schedulePreview()">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Customers Panel -->
+<div id="panelCustomers" class="panel">
+  <div class="scard">
+    <div class="scard-title"><i class="ti ti-adjustments"></i>Custom Fields</div>
+    <div id="extraFieldsDef"></div>
+    <button class="btn btn-purple" onclick="addEF()">
+      <i class="ti ti-plus"></i> Add Custom Field
+    </button>
+  </div>
+  <div id="customerList"></div>
+  <button class="btn btn-blue" onclick="addCustomer()" style="margin-bottom:80px">
+    <i class="ti ti-user-plus"></i> Add Customer
+  </button>
+</div>
+
+<!-- Preview Panel -->
+<div id="panelPreview" class="panel">
+  <div class="pinfo">
+    <i class="ti ti-info-circle"></i> Preview only — tap "Get PDF" to export
+  </div>
+  <div id="preview" style="overflow-x:hidden"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ── State ── */
+let customers   = [];
+let extraFields = [];
+let efId        = 0;
+
+const STORAGE_KEY = 'labelPrinterState_v1';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    customers   = Array.isArray(s.customers)   ? s.customers   : [];
+    extraFields = Array.isArray(s.extraFields) ? s.extraFields : [];
+    efId        = typeof s.efId === 'number'   ? s.efId        : 0;
+    if (s.labelsPerSheet) document.getElementById('labelsPerSheet').value = s.labelsPerSheet;
+    if (s.orientation)    document.getElementById('orientation').value    = s.orientation;
+    if (s.fontFamily)     document.getElementById('fontFamily').value     = s.fontFamily;
+    if (typeof s.autoSize === 'boolean') document.getElementById('autoSize').checked = s.autoSize;
+    if (s.sizeParty)   { document.getElementById('sizeParty').value   = s.sizeParty;   document.getElementById('v1').textContent = s.sizeParty   + 'pt'; }
+    if (s.sizeDetails) { document.getElementById('sizeDetails').value = s.sizeDetails; document.getElementById('v2').textContent = s.sizeDetails + 'pt'; }
+    if (s.sizeBoxNo)   { document.getElementById('sizeBoxNo').value   = s.sizeBoxNo;   document.getElementById('v3').textContent = s.sizeBoxNo   + 'pt'; }
+    return true;
+  } catch(e) { return false; }
+}
+
+let _saveTimer = null;
+function saveState() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        customers, extraFields, efId,
+        labelsPerSheet : document.getElementById('labelsPerSheet').value,
+        orientation    : document.getElementById('orientation').value,
+        fontFamily     : document.getElementById('fontFamily').value,
+        autoSize       : document.getElementById('autoSize').checked,
+        sizeParty      : document.getElementById('sizeParty').value,
+        sizeDetails    : document.getElementById('sizeDetails').value,
+        sizeBoxNo      : document.getElementById('sizeBoxNo').value,
+      }));
+    } catch(e) {}
+  }, 400);
+}
+
+/* ── Utilities ── */
+function x(s) {
+  return (s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+let _toastTimer = null;
+function toast(msg, duration = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+let _previewTimer = null;
+function schedulePreview() {
+  saveState();
+  updateSummary();
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(renderPreview, 220);
+}
+
+/* ── Tabs ── */
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t  => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel' + name).classList.add('active');
+  if (name === 'Preview') renderPreview();
+}
+
+/* ── Style ── */
+function toggleAuto() {
+  const a = document.getElementById('autoSize').checked;
+  const m = document.getElementById('manualSizes');
+  m.style.opacity       = a ? '0.4' : '1';
+  m.style.pointerEvents = a ? 'none' : 'auto';
+  schedulePreview();
+}
+
+/* ── Extra Fields ── */
+function addEF() {
+  const id = 'ef' + (efId++);
+  extraFields.push({ id, label: '' });
+  customers.forEach(c => { if (!c.extras) c.extras = {}; c.extras[id] = ''; });
+  renderEF();
+  renderCustomers();
+  saveState();
+}
+function removeEF(id) {
+  extraFields = extraFields.filter(f => f.id !== id);
+  customers.forEach(c => { if (c.extras) delete c.extras[id]; });
+  renderEF();
+  renderCustomers();
+  saveState();
+}
+function renderEF() {
+  document.getElementById('extraFieldsDef').innerHTML = extraFields.map(f => `
+    <div class="efrow">
+      <input class="inp" type="text" value="${x(f.label)}" placeholder="e.g. Bill No."
+        oninput="extraFields.find(e=>e.id==='${f.id}').label=this.value;renderCustomers();saveState()">
+      <button class="rmef" onclick="removeEF('${f.id}')">✕</button>
+    </div>`).join('');
+}
+
+/* ── Customers ── */
+function addCustomer() {
+  const ex = {};
+  extraFields.forEach(f => ex[f.id] = '');
+  customers.push({ name: '', place: '', contact: '', boxes: 1, extras: ex });
+  renderCustomers();
+  updateSummary();
+  saveState();
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.ccard');
+    if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function copyCustomer(i) {
+  const src = customers[i];
+  customers.splice(i + 1, 0, {
+    name    : src.name,
+    place   : src.place,
+    contact : src.contact,
+    boxes   : src.boxes,
+    extras  : { ...(src.extras || {}) }
+  });
+  renderCustomers();
+  updateSummary();
+  saveState();
+  toast('Customer duplicated ✓');
+}
+
+function removeCust(i) {
+  customers.splice(i, 1);
+  renderCustomers();
+  updateSummary();
+  schedulePreview();
+  saveState();
+}
+
+function clearAllCustomers() {
+  if (!customers.length) { toast('No customers to clear'); return; }
+  if (!confirm(`Remove all ${customers.length} customer(s)?`)) return;
+  customers = [];
+  renderCustomers();
+  updateSummary();
+  schedulePreview();
+  saveState();
+  toast('All customers cleared');
+}
+
+function uc(i, f, v) {
+  customers[i][f] = f === 'boxes' ? Math.max(1, parseInt(v) || 1) : v;
+  const b = document.getElementById('b' + i);
+  if (b) { const n = customers[i].boxes; b.textContent = n + ' Box' + (n > 1 ? 'es' : ''); }
+  const nameInp = document.getElementById('ni' + i);
+  const card    = document.getElementById('cc' + i);
+  if (nameInp && card) {
+    const empty = !customers[i].name.trim();
+    nameInp.classList.toggle('invalid', empty);
+    card.classList.toggle('has-error', empty);
+  }
+  schedulePreview();
+}
+
+function uce(i, id, v) {
+  if (!customers[i].extras) customers[i].extras = {};
+  customers[i].extras[id] = v;
+  schedulePreview();
+}
+
+function renderCustomers() {
+  document.getElementById('customerList').innerHTML = customers.map((c, i) => `
+    <div class="ccard${!c.name.trim() ? ' has-error' : ''}" id="cc${i}">
+      <div class="ch">
+        <span class="cnum">Customer ${i + 1}</span>
+        <span class="cbox" id="b${i}">${c.boxes} Box${c.boxes > 1 ? 'es' : ''}</span>
+        <button class="copyc" onclick="copyCustomer(${i})"><i class="ti ti-copy"></i> Copy</button>
+        <button class="rmc"   onclick="removeCust(${i})">✕ Remove</button>
+      </div>
+      <span class="fl">Party Name *</span>
+      <input class="inp${!c.name.trim() ? ' invalid' : ''}" id="ni${i}" type="text"
+             value="${x(c.name)}" placeholder="Party name"
+             oninput="uc(${i},'name',this.value)">
+      <span class="fl">Place</span>
+      <input class="inp" type="text" value="${x(c.place)}" placeholder="Place"
+             oninput="uc(${i},'place',this.value)">
+      <span class="fl">Contact</span>
+      <input class="inp" type="text" value="${x(c.contact)}" placeholder="Contact"
+             oninput="uc(${i},'contact',this.value)">
+      ${extraFields.map(f => `
+        <span class="fl">${x(f.label) || 'Custom Field'}</span>
+        <input class="inp" type="text"
+               value="${x((c.extras || {})[f.id] || '')}"
+               placeholder="${x(f.label) || 'Value'}"
+               oninput="uce(${i},'${f.id}',this.value)">`).join('')}
+      <span class="fl">Number of Boxes</span>
+      <input class="inp" type="number" min="1" value="${c.boxes}"
+             oninput="uc(${i},'boxes',this.value)">
+    </div>`).join('');
+}
+
+/* ── Config & Labels ── */
+function getConfig() {
+  const perSheet    = parseInt(document.getElementById('labelsPerSheet').value);
+  const orientation = document.getElementById('orientation').value;
+  const font        = document.getElementById('fontFamily').value;
+  const auto        = document.getElementById('autoSize').checked;
+  const mP          = parseInt(document.getElementById('sizeParty').value);
+  const mD          = parseInt(document.getElementById('sizeDetails').value);
+  const mB          = parseInt(document.getElementById('sizeBoxNo').value);
+  const map         = { 4:[2,2], 6:[2,3], 9:[3,3], 10:[2,5], 12:[3,4] };
+  const [cols,rows] = map[perSheet] || [2,3];
+  let pw = 210, ph = 297;
+  if (orientation === 'landscape') { pw = 297; ph = 210; }
+  return { perSheet, orientation, font, auto, mP, mD, mB, cols, rows, pw, ph };
+}
+
+function getAllLabels() {
+  const labels = [];
+  for (const c of customers)
+    for (let b = 1; b <= c.boxes; b++)
+      labels.push({ ...c, extras: { ...(c.extras || {}) }, boxNum: b });
+  return labels;
+}
+
+function buildLines(lbl) {
+  const l = [];
+  l.push({ text: lbl.name || '—', type: 'name' });
+  if (lbl.place   && lbl.place.trim())   l.push({ text: 'Place: ' + lbl.place,   type: 'detail' });
+  if (lbl.contact && lbl.contact.trim()) l.push({ text: 'Ph: '    + lbl.contact, type: 'detail' });
+  extraFields.forEach(f => {
+    const v = (lbl.extras || {})[f.id];
+    if (v && v.trim()) l.push({ text: (f.label || 'Field') + ': ' + v, type: 'extra' });
+  });
+  l.push({ text: 'Box ' + lbl.boxNum + ' / ' + lbl.boxes, type: 'boxno' });
+  return l;
+}
+
+/* ── Summary ── */
+function updateSummary() {
+  const { cols, rows } = getConfig();
+  const perSheet = cols * rows;
+  const total    = getAllLabels().length;
+  const pages    = total ? Math.ceil(total / perSheet) : 0;
+  document.getElementById('summaryText').textContent =
+    `${total} label${total !== 1 ? 's' : ''} across ${pages} page${pages !== 1 ? 's' : ''}`;
+}
+
+/* ── Preview ── */
+function renderPreview() {
+  const { cols, rows, pw, ph, font, auto, mP, mD, mB } = getConfig();
+  const pad  = 6;
+  const cWmm = (pw - pad * 2) / cols;
+  const cHmm = (ph - pad * 2) / rows;
+  const PX   = 3.7795;
+  const cWpx = cWmm * PX;
+  const cHpx = cHmm * PX;
+
+  const labels   = getAllLabels();
+  const perSheet = cols * rows;
+  const pages    = [];
+  for (let i = 0; i < labels.length; i += perSheet) pages.push(labels.slice(i, i + perSheet));
+  if (!pages.length) pages.push([]);
+
+  const cW    = document.getElementById('preview').offsetWidth || 340;
+  const pgPx  = pw * PX;
+  const pgHpx = ph * PX;
+  const sc    = Math.min(1, cW / pgPx);
+
+  document.getElementById('preview').innerHTML = pages.map(page => {
+    const cells = Array.from({ length: perSheet }, (_, ci) => {
+      const lbl = page[ci];
+      if (!lbl) return `<div class="lc lb" style="width:${cWmm}mm;height:${cHmm}mm"></div>`;
+      const lines = buildLines(lbl);
+      const iW = cWpx - 20, iH = cHpx - 16;
+      let html = '';
+      lines.forEach(l => {
+        let fs;
+        if (auto) {
+          const dC = lines.filter(ll => ll.type === 'detail' || ll.type === 'extra').length;
+          const nR = 0.38, bR = 0.18, dR = dC ? (1 - 0.38 - 0.18) / dC : 0;
+          const r  = l.type === 'name' ? nR : l.type === 'boxno' ? bR : dR;
+          fs       = Math.min(Math.floor(iH * r * 0.85), l.type === 'name' ? 110 : 72);
+          const mC = Math.max(1, Math.floor(iW / (fs * 0.56)));
+          if (l.text.length > mC) fs = Math.floor(fs * mC / l.text.length);
+          fs = Math.max(7, fs);
+        } else {
+          fs = l.type === 'name' ? mP : l.type === 'boxno' ? mB : mD;
+        }
+        if (l.type === 'name') {
+          html += `<div style="font-size:${fs}px;font-weight:800;line-height:1.1;word-break:break-word;width:100%;font-family:${font}">${x(l.text)}</div>`;
+        } else if (l.type === 'boxno') {
+          html += `<div style="font-size:${fs}px;font-weight:700;border:2px solid #222;border-radius:4px;padding:1px 6px;background:#f0f0f0;margin-top:2px;font-family:${font}">${x(l.text)}</div>`;
+        } else {
+          html += `<div style="font-size:${fs}px;color:#333;word-break:break-word;width:100%;font-family:${font}">${x(l.text)}</div>`;
+        }
+      });
+      return `<div class="lc" style="width:${cWmm}mm;height:${cHmm}mm;gap:1px">${html}</div>`;
+    }).join('');
+
+    const scaledH = pgHpx * sc;
+    return `
+      <div class="preview-page-wrap" style="width:${cW}px;height:${scaledH}px">
+        <div class="a4-page"
+             style="width:${pw}mm;min-height:${ph}mm;padding:${pad}mm;
+                    grid-template-columns:repeat(${cols},${cWmm}mm);
+                    grid-template-rows:repeat(${rows},${cHmm}mm);
+                    transform:scale(${sc});transform-origin:top left">
+          ${cells}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ── PDF ── */
+function generatePDF() {
+  const unnamed = customers.filter(c => !c.name.trim()).length;
+  if (unnamed > 0) {
+    if (!confirm(`${unnamed} customer(s) have no name and will show "—". Continue?`)) return;
+  }
+  if (!customers.length) { toast('Add at least one customer first'); return; }
+
+  const btn = document.getElementById('pdfBtn');
+  btn.innerHTML = '⏳ Building...';
+  btn.disabled  = true;
+
+  setTimeout(() => {
+    try {
+      const { cols, rows, pw, ph, font, auto, mP, mD, mB, orientation } = getConfig();
+      const perSheet = cols * rows;
+      const pad      = 6;
+      const cWmm     = (pw - pad * 2) / cols;
+      const cHmm     = (ph - pad * 2) / rows;
+      const MM_PER_PT = 0.3528;
+
+      const doc = new window.jspdf.jsPDF({
+        orientation : orientation === 'landscape' ? 'l' : 'p',
+        unit        : 'mm',
+        format      : 'a4'
+      });
+
+      const labels = getAllLabels();
+      const pages  = [];
+      for (let i = 0; i < labels.length; i += perSheet) pages.push(labels.slice(i, i + perSheet));
+      if (!pages.length) pages.push([]);
+
+      pages.forEach((page, pi) => {
+        if (pi > 0) doc.addPage('a4', orientation === 'landscape' ? 'l' : 'p');
+        page.forEach((lbl, ci) => {
+          if (!lbl) return;
+          const col = ci % cols, row = Math.floor(ci / cols);
+          const bx  = pad + col * cWmm, by = pad + row * cHmm;
+          doc.setDrawColor(40,40,40); doc.setLineWidth(0.3);
+          doc.rect(bx, by, cWmm, cHmm);
+          const lines = buildLines(lbl);
+          const iWmm  = cWmm - 4, iHmm = cHmm - 4;
+          const dC    = lines.filter(l => l.type === 'detail' || l.type === 'extra').length;
+          const nR = 0.38, bR = 0.18, dR = dC ? (1 - nR - bR) / dC : 0;
+          let cy = by + 2;
+          lines.forEach(l => {
+            let fsMM;
+            if (auto) {
+              const r = l.type === 'name' ? nR : l.type === 'boxno' ? bR : dR;
+              fsMM    = Math.min(iHmm * r * 0.78, l.type === 'name' ? 14 : 9);
+              const mC = Math.max(1, Math.floor(iWmm / (fsMM * 0.54)));
+              if (l.text.length > mC) fsMM = Math.max(2, fsMM * mC / l.text.length);
+            } else {
+              const ptMap = { name: mP, boxno: mB, detail: mD, extra: mD };
+              fsMM = (ptMap[l.type] || mD) * MM_PER_PT;
+            }
+            const fsPt = fsMM / MM_PER_PT;
+            const bold = l.type === 'name' || l.type === 'boxno';
+            doc.setFont(font, bold ? 'bold' : 'normal');
+            doc.setFontSize(fsPt);
+            doc.setTextColor(l.type === 'detail' || l.type === 'extra' ? 90 : 20);
+            const lhMM    = fsMM * 1.25;
+            const wrapped = doc.splitTextToSize(l.text, iWmm);
+            if (l.type === 'boxno') {
+              const twMM = doc.getTextWidth(l.text);
+              doc.setFillColor(240,240,240); doc.setDrawColor(40,40,40); doc.setLineWidth(0.2);
+              doc.roundedRect(bx + cWmm/2 - twMM/2 - 2, cy, twMM + 4, lhMM + 1, 1, 1, 'FD');
+              doc.setTextColor(20);
+              doc.text(l.text, bx + cWmm/2, cy + lhMM, { align:'center' });
+              cy += lhMM + 2;
+            } else {
+              wrapped.forEach((wl, wi) => doc.text(wl, bx + cWmm/2, cy + lhMM*(wi+1), { align:'center' }));
+              cy += lhMM * wrapped.length + 1;
+            }
+          });
+        });
+      });
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isIOS) {
+        doc.save('labels.pdf');
+      } else {
+        const blob    = doc.output('blob');
+        const blobURL = URL.createObjectURL(blob);
+        const win     = window.open(blobURL, '_blank');
+        if (!win) { doc.save('labels.pdf'); toast('PDF downloaded ✓'); }
+        else { toast('PDF opened in new tab ✓'); setTimeout(() => URL.revokeObjectURL(blobURL), 30000); }
+      }
+    } catch(e) { toast('Error: ' + e.message); console.error(e); }
+    btn.innerHTML = '<i class="ti ti-file-type-pdf"></i> Get PDF';
+    btn.disabled  = false;
+  }, 80);
+}
+
+/* ── Init ── */
+// Clear any old storage so we always start fresh with 1 blank customer
+localStorage.removeItem(STORAGE_KEY);
+
+// Start with exactly 1 blank customer, no prefilled data
+customers = [{ name: '', place: '', contact: '', boxes: 1, extras: {} }];
+
+toggleAuto();
+renderEF();
+renderCustomers();
+updateSummary();
+renderPreview();
+</script>
+</body>
+</html>
